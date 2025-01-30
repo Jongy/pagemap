@@ -11,21 +11,22 @@
 #define FIND_LIB_NAME
 
 static void print_page(uint64_t address, uint64_t data,
-    const char *lib_name) {
+    const char *lib_name, const char *perms) {
 
     printf("0x%-16lx : pfn %-16lx soft-dirty %ld file/shared %ld "
-        "swapped %ld present %ld library %s\n",
+        "swapped %ld present %ld perms %s library %s\n",
         address,
         data & 0x7fffffffffffff,
         (data >> 55) & 1,
         (data >> 61) & 1,
         (data >> 62) & 1,
         (data >> 63) & 1,
+        perms,
         lib_name);
 }
 
 void handle_virtual_range(int pagemap, uint64_t start_address,
-    uint64_t end_address, const char *lib_name) {
+    uint64_t end_address, const char *lib_name, const char *perms) {
 
     for(uint64_t i = start_address; i < end_address; i += 0x1000) {
         uint64_t data;
@@ -35,7 +36,7 @@ void handle_virtual_range(int pagemap, uint64_t start_address,
             break;
         }
 
-        print_page(i, data, lib_name);
+        print_page(i, data, lib_name, perms);
     }
 }
 
@@ -94,8 +95,13 @@ void parse_maps(const char *maps_file, const char *pagemap_file) {
                 }
 
                 const char *lib_name = 0;
+                x++; // skip space
+                const char *perms = buffer + x;
+                while(buffer[x] != ' ' && x+1 < sizeof buffer) x ++;
+                buffer[x] = 0;
+
 #ifdef FIND_LIB_NAME
-                for(int field = 0; field < 4; field ++) {
+                for(int field = 0; field < 3; field ++) {
                     x ++;  // skip space
                     while(buffer[x] != ' ' && x+1 < sizeof buffer) x ++;
                 }
@@ -108,7 +114,7 @@ void parse_maps(const char *maps_file, const char *pagemap_file) {
                 lib_name = buffer + x;
 #endif
 
-                handle_virtual_range(pagemap, low, high, lib_name);
+                handle_virtual_range(pagemap, low, high, lib_name, perms);
 
 #ifdef FIND_LIB_NAME
                 buffer[y] = '\n';
